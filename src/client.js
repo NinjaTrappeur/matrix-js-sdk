@@ -3308,9 +3308,15 @@ MatrixClient.prototype.sendReadReceipt = async function(event, opts, callback) {
         throw new Error(`Cannot set read receipt to a pending event (${eventId})`);
     }
 
-    const addlContent = {
-        "m.hidden": Boolean(opts.hidden),
-    };
+    const serverSupportHiddenRR = await this.doesServerAcceptHiddenReadReceipt();
+
+    if (serverSupportHiddenRR) {
+        const addlContent = {
+            "m.hidden": Boolean(opts.hidden),
+        };
+    } else {
+        const addlContent = {};
+    }
 
     return this.sendReceipt(event, "m.read", addlContent, callback);
 };
@@ -5432,6 +5438,19 @@ MatrixClient.prototype.doesServerAcceptIdentityAccessToken = async function() {
     const unstableFeatures = response["unstable_features"];
     return (versions && versions.includes("r0.6.0"))
         || (unstableFeatures && unstableFeatures["m.id_access_token"]);
+};
+
+/**
+ * Query the server to see if the read receipt can stay hidden and not
+ * propagated to the other room users using a m.hidden flag.
+ * @return {Promise<boolean>} true if m_hidden
+ */
+MatrixClient.prototype.doesServerAcceptHiddenReadReceipt = async function () {
+    const response = await this.getVersions();
+    if (!response) return false;
+
+    const unstableFeatures = response["unstable_features"];
+    return (unstableFeatures || unstableFeatures["org.matrix.msc2285"]);
 };
 
 /**
